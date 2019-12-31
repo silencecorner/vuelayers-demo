@@ -8,7 +8,7 @@
       <vl-view ref="view" :center.sync="center" :zoom.sync="zoom" :rotation.sync="rotation"></vl-view>
 
       <!-- interactions -->
-      <vl-interaction-select :features.sync="selectedFeatures" v-if="drawType == null">
+      <vl-interaction-select ref="selectInteraction" :condition="selectCondition" :filter="filter" :features.sync="selectedFeatures" v-if="drawType == null">
         <template slot-scope="select">
           <!-- select styles -->
           <vl-style-box>
@@ -76,7 +76,7 @@
       <!--// geolocation -->
 
       <!-- overlay marker with animation -->
-      <vl-feature id="marker" ref="marker" :properties="{ start: Date.now(), duration: 2500 }">
+      <vl-feature id="marker" v-if="showMarker" ref="marker" :properties="{ start: Date.now(), duration: 2500 }">
         <template slot-scope="feature">
           <vl-geom-point :coordinates="[-10, -10]"></vl-geom-point>
           <vl-style-box>
@@ -146,7 +146,6 @@
       <vl-layer-vector id="draw-pane" v-if="mapPanel.tab === 'draw'">
         <vl-source-vector ident="draw-target" :features.sync="drawnFeatures"></vl-source-vector>
       </vl-layer-vector>
-
       <vl-interaction-draw v-if="mapPanel.tab === 'draw' && drawType" source="draw-target" :type="drawType"></vl-interaction-draw>
       <vl-interaction-modify v-if="mapPanel.tab === 'draw'" source="draw-target"></vl-interaction-modify>
       <vl-interaction-snap v-if="mapPanel.tab === 'draw'" source="draw-target" :priority="10"></vl-interaction-snap>
@@ -239,6 +238,7 @@
 <script>
   import { kebabCase, range, random, camelCase } from 'lodash'
   import { createProj, addProj, findPointOnSurface, createStyle, createMultiPointGeom, loadingBBox } from 'vuelayers/lib/ol-ext'
+  import { click } from 'ol/events/condition'
   import pacmanFeaturesCollection from './assets/pacman.geojson'
   import ScaleLine from 'ol/control/ScaleLine'
   import FullScreen from 'ol/control/FullScreen'
@@ -263,6 +263,11 @@
   const methods = {
     camelCase,
     pointOnSurface: findPointOnSurface,
+    selectCondition: click,
+    filter (feature) {
+      console.log(feature)
+      return feature.id_ === 'marker'
+    },
     geometryTypeToCmpName (type) {
       return 'vl-geom-' + kebabCase(type)
     },
@@ -410,13 +415,29 @@
         this.drawType = undefined
       }
     },
+    removeSelection (feature) {
+      this.$refs.selectInteraction.clearFeatures()
+      this.showMarker = false
+      console.log(this.$refs.map.getFeatures())
+      console.log(this.$refs.marker)
+    },
   }
 
   export default {
     name: 'vld-demo-app',
     methods,
+    watch: {
+      selectedFeatures: {
+        handler (selectedFeatures) {
+          if (selectedFeatures.length > 0) {
+            this.removeSelection(selectedFeatures[0])
+          }
+        },
+      },
+    },
     data () {
       return {
+        showMarker: true,
         center: [0, 0],
         zoom: 2,
         rotation: 0,
